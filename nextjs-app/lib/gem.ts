@@ -48,20 +48,43 @@ interface GemFilters {
   status?: string | null;
 }
 
+/** Node/undici's fetch() wraps every network failure in a generic
+ * "TypeError: fetch failed" and puts the actual reason on `.cause` (which
+ * can itself have a `.cause`, e.g. for TLS errors). Walk the whole chain so
+ * the real reason is visible instead of just "fetch failed". */
+function errorChain(err: unknown): { text: string; code: string | null } {
+  const parts: string[] = [];
+  let code: string | null = null;
+  let current: any = err;
+  let depth = 0;
+  while (current && depth < 6) {
+    const label = current.code || current.name || current.constructor?.name || "Error";
+    const msg = current.message || String(current);
+    parts.push(`${label}: ${msg}`);
+    if (!code && current.code) code = current.code;
+    current = current.cause;
+    depth++;
+  }
+  return { text: parts.join(" → caused by → "), code };
+}
+
+const NETWORK_BLOCK_CODES = new Set(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EHOSTUNREACH", "ENETUNREACH"]);
+
 function describeError(err: unknown): string {
-  const cause = (err as any)?.cause;
-  const code = cause?.code || (err as any)?.code;
-  if (code === "ECONNREFUSED" || code === "ECONNRESET" || code === "ETIMEDOUT") {
+  const { text, code } = errorChain(err);
+
+  if (code && NETWORK_BLOCK_CODES.has(code)) {
     return (
       "Unavailable for automated access: could not open a connection to GeM " +
       `(${code}). GeM is reachable from ordinary residential/ISP connections, so this ` +
       "usually means GeM's firewall is blocking this server's network range (a common " +
       "anti-bot measure many Indian government sites apply to known cloud/PaaS datacenter " +
       "IPs). This is not a code bug and this project does not attempt to route around it. " +
-      "Try running the app locally, or from infrastructure with a normal ISP egress IP."
+      `Try running the app locally, or from infrastructure with a normal ISP egress IP. (${text})`
     );
   }
-  return `Unavailable for automated access: ${err instanceof Error ? err.message : String(err)}`;
+
+  return `Unavailable for automated access: ${text}`;
 }
 
 async function fetchSessionToken(): Promise<{ token: string | null; cookie: string }> {
