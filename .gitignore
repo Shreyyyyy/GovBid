@@ -1,0 +1,15 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+data/govbid.db
+data/documents/*
+data/raw/*
+data/processed/*
+!data/documents/.gitkeep
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+.pytest_cache/
+.DS_Store
+*.egg-info/

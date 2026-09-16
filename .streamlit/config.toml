@@ -1,0 +1,9 @@
+[theme]
+primaryColor = "#0F5E8B"
+linkColor = "#0F5E8B"
+font = "sans serif"
+baseRadius = "small"
+showWidgetBorder = true
+
+[browser]
+gatherUsageStats = false

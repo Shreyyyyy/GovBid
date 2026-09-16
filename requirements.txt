@@ -1,0 +1,15 @@
+streamlit
+watchdog
+groq
+python-dotenv
+sqlalchemy
+pandas
+requests
+beautifulsoup4
+lxml
+pymupdf
+pdfplumber
+openpyxl
+pydantic
+pydantic-settings
+pytest
