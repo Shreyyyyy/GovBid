@@ -17,7 +17,17 @@
 const GEM_ALL_BIDS_PAGE = "https://bidplus.gem.gov.in/all-bids";
 const GEM_ALL_BIDS_DATA = "https://bidplus.gem.gov.in/all-bids-data";
 const GEM_BASE_URL = "https://bidplus.gem.gov.in";
-const MAX_PAGES = 5;
+
+// Not a fixed page cap - we fetch until GeM itself has no more results for
+// the query. This ceiling only exists to stop a very broad/generic query
+// (tens of thousands of matches) from turning into thousands of sequential
+// requests to GeM in one search, which would be aggressive scraping.
+const MAX_PAGES = Number(process.env.GEM_MAX_PAGES) || 100;
+const REQUEST_DELAY_MS = 200;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const CSRF_RE = /csrf_bd_gem_nk['"]?\s*:\s*['"]([a-f0-9]{16,64})['"]/;
 
@@ -201,15 +211,16 @@ export async function searchGem(filters: GemFilters): Promise<GemSearchResult> {
 
       allBids.push(...docs.map(normalizeDoc));
       if (allBids.length >= totalFound) break;
+      if (page < MAX_PAGES) await sleep(REQUEST_DELAY_MS);
     }
   } catch (err) {
     return { bids: allBids, totalFound, reachable: false, message: describeError(err) };
   }
 
-  return {
-    bids: allBids,
-    totalFound,
-    reachable: true,
-    message: `Fetched ${allBids.length} of ${totalFound} matching bids from GeM (page size limited to ${MAX_PAGES} pages).`,
-  };
+  const cappedByCeiling = allBids.length < totalFound && allBids.length >= MAX_PAGES * 10;
+  const message = cappedByCeiling
+    ? `Fetched ${allBids.length} of ${totalFound} matching bids from GeM (stopped at the ${MAX_PAGES}-page safety ceiling for very broad queries - narrow your search to see more).`
+    : `Fetched all ${allBids.length} matching bids from GeM.`;
+
+  return { bids: allBids, totalFound, reachable: true, message };
 }

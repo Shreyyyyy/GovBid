@@ -46,8 +46,12 @@ class Settings:
     database_url: str = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR / 'govbid.db'}")
 
     enabled_sources: List[str] = _get_list("ENABLED_SOURCES", ["gem"])
-    max_pages_per_source: int = int(os.getenv("MAX_PAGES_PER_SOURCE", "10"))
-    request_delay_seconds: float = float(os.getenv("REQUEST_DELAY_SECONDS", "1"))
+    # Not a fixed page size - GeM search already stops once it has no more
+    # results. This is a safety ceiling so a very broad/generic query (tens
+    # of thousands of matches) can't turn into thousands of sequential
+    # requests in one search, which would be aggressive scraping.
+    max_pages_per_source: int = int(os.getenv("MAX_PAGES_PER_SOURCE", "100"))
+    request_delay_seconds: float = float(os.getenv("REQUEST_DELAY_SECONDS", "0.2"))
     request_timeout_seconds: int = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "15"))
     max_download_size_mb: int = int(os.getenv("MAX_DOWNLOAD_SIZE_MB", "25"))
 

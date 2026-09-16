@@ -160,7 +160,16 @@ class GemConnector(BaseConnector):
             return SearchResult(bids=[self.normalize(b) for b in all_bids], status=status)
 
         normalized = [self.normalize(b) for b in all_bids]
-        message = f"Fetched {len(normalized)} of {total_found} matching bids from GeM (page size limited to {settings_max_pages()} pages)."
+        max_pages = settings_max_pages()
+        capped_by_ceiling = len(normalized) < total_found and len(normalized) >= max_pages * 10
+        if capped_by_ceiling:
+            message = (
+                f"Fetched {len(normalized)} of {total_found} matching bids from GeM "
+                f"(stopped at the {max_pages}-page safety ceiling for very broad queries "
+                "- narrow your search to see more)."
+            )
+        else:
+            message = f"Fetched all {len(normalized)} matching bids from GeM."
         return SearchResult(bids=normalized, status=SourceStatus(source=self.name, reachable=True, message=message))
 
     def fetch_bid(self, bid_id: str) -> Optional[dict[str, Any]]:
