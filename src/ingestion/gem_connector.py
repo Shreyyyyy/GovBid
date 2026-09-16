@@ -20,6 +20,8 @@ import datetime as dt
 import re
 from typing import Any, Optional
 
+import requests
+
 from src.ingestion.base_connector import BaseConnector, SearchResult, SourceStatus
 from src.utils.logging import get_logger
 
@@ -36,6 +38,26 @@ _DOC_LABEL_BY_BID_TYPE = {
     2: "showradocumentPdf",
 }
 _DEFAULT_DOC_LABEL = "showbidDocument"
+
+
+def _describe_connection_error(exc: Exception) -> str:
+    """Distinguish a network-level block (connection refused/reset - typically
+    a host's firewall rejecting a hosting provider's IP range) from other
+    failures, so the real cause is visible instead of a generic traceback."""
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return (
+            "Unavailable for automated access: could not open a connection to GeM "
+            "(connection refused/reset). GeM is reachable from ordinary residential/"
+            "ISP connections, so this usually means GeM's firewall is blocking this "
+            "server's network range (a common anti-bot measure many Indian government "
+            "sites apply to known cloud/PaaS datacenter IPs, e.g. Render, AWS, Heroku). "
+            "This is not a code bug and this project does not attempt to route around "
+            "it. Try running the app locally, or from infrastructure with a normal ISP "
+            "egress IP, instead."
+        )
+    if isinstance(exc, requests.exceptions.Timeout):
+        return f"Unavailable for automated access: GeM did not respond in time ({exc})."
+    return f"Unavailable for automated access: {exc}"
 
 
 class GemConnector(BaseConnector):
@@ -58,7 +80,7 @@ class GemConnector(BaseConnector):
             return SourceStatus(source=self.name, reachable=reachable, message=message)
         except Exception as exc:
             logger.info("GeM health check failed: %s", exc)
-            return SourceStatus(source=self.name, reachable=False, message=f"GeM unreachable: {exc}")
+            return SourceStatus(source=self.name, reachable=False, message=_describe_connection_error(exc))
 
     def _query_page(self, token: str, param: dict[str, Any], filter_: dict[str, Any], page: Optional[int] = None) -> dict[str, Any]:
         payload: dict[str, Any] = {"param": param, "filter": filter_}
@@ -93,7 +115,7 @@ class GemConnector(BaseConnector):
             logger.warning("GeM: failed to establish session: %s", exc)
             return SearchResult(
                 bids=[],
-                status=SourceStatus(source=self.name, reachable=False, message=f"Unavailable for automated access: {exc}"),
+                status=SourceStatus(source=self.name, reachable=False, message=_describe_connection_error(exc)),
             )
 
         if not token:
@@ -133,7 +155,7 @@ class GemConnector(BaseConnector):
             status = SourceStatus(
                 source=self.name,
                 reachable=False,
-                message=f"Unavailable for automated access: {exc}",
+                message=_describe_connection_error(exc),
             )
             return SearchResult(bids=[self.normalize(b) for b in all_bids], status=status)
 

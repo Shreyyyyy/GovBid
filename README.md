@@ -136,6 +136,19 @@ in the local database.
 
 ## Known limitations
 
+- **Cloud PaaS deployments (Render, Heroku, AWS, etc.) may be unable to reach GeM at all.**
+  GeM (like many Indian government sites) blocks known cloud/datacenter IP ranges at the
+  firewall level as an anti-bot measure, while allowing ordinary residential/ISP traffic
+  through. From such a host you'll see a connection error like
+  `Connection refused (Errno 111)` rather than an HTTP error - this is GeM's network
+  rejecting the request before it ever reaches the application, not a bug in this code,
+  and not something this project will route around (that would mean bypassing an access
+  control GeM has deliberately put up, which the project's own rules forbid). The app
+  degrades correctly in this situation - it reports "Unavailable for automated access"
+  rather than crashing or fabricating data. If you need reliable live search, run the app
+  locally (verified working) or from infrastructure with a normal ISP egress IP; the manual
+  PDF upload + AI analysis features on the bid detail page work regardless of network
+  reachability.
 - GeM's `all-bids-data` endpoint is undocumented (it's the site's internal AJAX contract,
   not a published API) and can change without notice — a markup/JS change on GeM's side
   could break the CSRF-token or field parsing. When that happens the connector will fail
